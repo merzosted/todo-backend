@@ -25,6 +25,7 @@ app.use('/api/todos', todoRoutes);
 app.use('/', (req, res) => {
   res.send('API is running...');
 });
+
 // Connect DB and start server
 connectDB();
 const PORT = process.env.PORT || 5000;
