@@ -1,57 +1,94 @@
-import { Request, Response } from "express";
+import { Response, NextFunction } from "express";
 import { Todo } from "../models/todo.js";
 import { AuthRequest } from "../middleware/auth.middleware.js";
 
-export const createTodo = async (req: AuthRequest, res: Response) => {
+// Create new todo
+// POST /api/todos
+export const createTodo = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { title } = req.body;
 
+    if (!title) {
+      return res.status(400).json({ success: false, message: "Title is required" });
+    }
+
     const todo = await Todo.create({
       title,
-      userId: req.user.id
+      userId: req.user.id,
+      completed: false,
     });
 
-    res.status(201).json(todo);
+    res.status(201).json({ success: true, data: todo });
   } catch (error) {
-    console.error("Create todo error:", error);
-    res.status(500).json({ message: "Server error" });
+    next(error);
   }
 };
 
-export const getTodos = async (req: AuthRequest, res: Response) => {
+//  Get all todos for logged in user
+// GET /api/todos
+export const getTodos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const todos = await Todo.find({ userId: req.user.id });
-    res.json(todos);
+    const todos = await Todo.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    res.json({ success: true, count: todos.length, data: todos });
   } catch (error) {
-    console.error("Get todos error:", error);
-    res.status(500).json({ message: "Server error" });
+    next(error);
   }
 };
 
-export const updateTodo = async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const updated = await Todo.findOneAndUpdate(
-      { _id: id, userId: req.user.id },
-      req.body,
-      { new: true }
-    );
-
-    res.json(updated);
-  } catch (error) {
-    console.error("Update todo error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-export const deleteTodo = async (req: AuthRequest, res: Response) => {
+// Update todo
+// PUT /api/todos/:id
+export const updateTodo = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    await Todo.findOneAndDelete({ _id: id, userId: req.user.id });
+    
+    const todo = await Todo.findOne({ _id: id, userId: req.user.id });
+    if (!todo) {
+      return res.status(404).json({ success: false, message: "Todo not found" });
+    }
 
-    res.json({ message: "Todo deleted" });
+    const updated = await Todo.findByIdAndUpdate(id, req.body, { new: true });
+
+    res.json({ success: true, data: updated });
   } catch (error) {
-    console.error("Delete todo error:", error);
-    res.status(500).json({ message: "Server error" });
+    next(error);
+  }
+};
+
+// Delete todo
+// DELETE /api/todos/:id
+export const deleteTodo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    
+    const todo = await Todo.findOne({ _id: id, userId: req.user.id });
+    if (!todo) {
+      return res.status(404).json({ success: false, message: "Todo not found" });
+    }
+
+    await Todo.findByIdAndDelete(id);
+
+    res.json({ success: true, message: "Todo deleted" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Toggle todo completion
+// PATCH /api/todos/:id/toggle
+export const toggleTodo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    
+    const todo = await Todo.findOne({ _id: id, userId: req.user.id });
+    if (!todo) {
+      return res.status(404).json({ success: false, message: "Todo not found" });
+    }
+
+    todo.completed = !todo.completed;
+    await todo.save();
+
+    res.json({ success: true, data: todo });
+  } catch (error) {
+    next(error);
   }
 };
